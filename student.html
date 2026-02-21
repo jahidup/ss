@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.5">
+  <title>Student Portal – Login</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <style>
+    body { background: linear-gradient(145deg, #f0f4ff 0%, #e6edfa 100%); min-height: 100vh; }
+    .glass-card { background: rgba(255,255,255,0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); box-shadow: 0 20px 35px -10px rgba(0,0,0,0.1); }
+    .loading-dots { display: inline-flex; align-items: center; gap: 6px; }
+    .loading-dots span { width: 10px; height: 10px; background: #3b82f6; border-radius: 50%; animation: bounce 1.4s infinite ease-in-out both; }
+    .loading-dots span:nth-child(1) { animation-delay: -0.32s; }
+    .loading-dots span:nth-child(2) { animation-delay: -0.16s; }
+    @keyframes bounce { 0%,80%,100% { transform: scale(0); } 40% { transform: scale(1); } }
+    .message-bubble-student { background: #dbeafe; color: #1e3a8a; }
+    .message-bubble-admin { background: #e5e7eb; color: #1f2937; }
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(5px); align-items: center; justify-content: center; z-index: 1000; }
+    .modal-content { background: white; padding: 2rem; border-radius: 2rem; max-width: 500px; width: 90%; text-align: center; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); max-height: 90vh; overflow-y: auto; }
+    .refresh-btn { cursor: pointer; color: #3b82f6; margin-left: 8px; }
+  </style>
+</head>
+<body class="font-sans antialiased flex items-center justify-center p-4">
+  <div class="glass-card w-full max-w-4xl rounded-3xl p-8">
+    <!-- Header with language toggle -->
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-700 bg-clip-text text-transparent" data-i18n="appTitle">📘 Student Portal</h1>
+      <div class="flex space-x-2">
+        <button onclick="setLanguage('en')" class="px-3 py-1 bg-white/80 text-blue-800 rounded-full text-sm font-medium shadow-sm">EN</button>
+        <button onclick="setLanguage('hi')" class="px-3 py-1 bg-white/80 text-indigo-800 rounded-full text-sm font-medium shadow-sm">हिंदी</button>
+      </div>
+    </div>
+
+    <!-- Login Form -->
+    <div id="loginForm" class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1" data-i18n="studentId">Student ID</label>
+        <input type="text" id="studentId" class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/70" placeholder="e.g. 2024CS001">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1" data-i18n="dob">Date of Birth (8 digits, DDMMYYYY)</label>
+        <input type="text" id="dob" class="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white/70" placeholder="01012005" maxlength="8" pattern="\d{8}" inputmode="numeric">
+        <p class="text-xs text-gray-500 mt-1" data-i18n="dobHint">Exactly 8 digits, e.g. 01012005</p>
+      </div>
+      <button onclick="handleLogin()" id="loginBtn" class="w-full bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-semibold py-3 px-4 rounded-xl transition duration-200 flex items-center justify-center gap-2 shadow-lg">
+        <span data-i18n="login">Login</span>
+      </button>
+    </div>
+
+    <!-- Dashboard (hidden until login) -->
+    <div id="dashboardContainer" class="hidden space-y-6 mt-6">
+      <!-- Student Info Card -->
+      <div class="bg-white/60 rounded-2xl p-6 border border-white/30">
+        <div class="flex items-center gap-4">
+          <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center text-3xl text-blue-600">
+            <i class="fas fa-user-graduate"></i>
+          </div>
+          <div>
+            <h2 class="text-2xl font-bold text-gray-800" id="studentNameDisplay"></h2>
+            <p class="text-gray-600" id="studentIdDisplay"></p>
+            <p class="text-sm text-gray-500" id="studentDobDisplay"></p>
+          </div>
+          <button onclick="logout()" class="ml-auto px-4 py-2 rounded-full border border-gray-300 hover:bg-gray-100 flex items-center gap-2">
+            <i class="fas fa-sign-out-alt"></i> <span data-i18n="logout">Logout</span>
+          </button>
+        </div>
+        <div class="grid grid-cols-2 gap-4 mt-4">
+          <div class="bg-white/50 p-3 rounded-xl text-center">
+            <p class="text-sm text-gray-500" data-i18n="testsTaken">Tests Taken</p>
+            <p id="statsTestsTaken" class="text-2xl font-bold text-blue-600">0</p>
+          </div>
+          <div class="bg-white/50 p-3 rounded-xl text-center relative">
+            <p class="text-sm text-gray-500" data-i18n="avgScore">Avg. Score</p>
+            <p id="statsAvgScore" class="text-2xl font-bold text-indigo-600">0</p>
+            <button onclick="showRankInfo()" class="absolute top-1 right-1 text-gray-400 hover:text-gray-600"><i class="fas fa-info-circle"></i></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="flex flex-wrap border-b border-gray-200 gap-2">
+        <button onclick="showTab('tests')" class="tab-btn px-4 py-2 text-gray-600 font-medium border-b-2 border-transparent hover:border-blue-300" id="tabTests" data-i18n="availableTests">Available Tests</button>
+        <button onclick="showTab('results')" class="tab-btn px-4 py-2 text-gray-600 font-medium border-b-2 border-transparent hover:border-blue-300" id="tabResults" data-i18n="previousResults">Previous Results</button>
+        <button onclick="showTab('discussions')" class="tab-btn px-4 py-2 text-gray-600 font-medium border-b-2 border-transparent hover:border-blue-300" id="tabDiscussions" data-i18n="discussions">Discussions</button>
+        <button onclick="showTab('messages')" class="tab-btn px-4 py-2 text-gray-600 font-medium border-b-2 border-transparent hover:border-blue-300" id="tabMessages" data-i18n="messages">Messages</button>
+      </div>
+
+      <!-- Tab: Available Tests -->
+      <div id="testsTab" class="tab-pane">
+        <div class="flex justify-between items-center mb-2">
+          <h3 class="font-semibold">Available Tests</h3>
+          <i class="fas fa-sync-alt refresh-btn" onclick="loadAvailableTests()" title="Refresh"></i>
+        </div>
+        <div id="availableTestsList" class="space-y-3"></div>
+      </div>
+
+      <!-- Tab: Results -->
+      <div id="resultsTab" class="tab-pane hidden">
+        <div class="flex justify-between items-center mb-2">
+          <h3 class="font-semibold">Previous Results</h3>
+          <i class="fas fa-sync-alt refresh-btn" onclick="loadResults()" title="Refresh"></i>
+        </div>
+        <div id="previousResultsList" class="overflow-x-auto"></div>
+      </div>
+
+      <!-- Tab: Discussions -->
+      <div id="discussionsTab" class="tab-pane hidden">
+        <div class="flex justify-between items-center mb-2">
+          <h3 class="font-semibold">Discussions</h3>
+          <i class="fas fa-sync-alt refresh-btn" onclick="loadDiscussions()" title="Refresh"></i>
+        </div>
+        <div class="mb-4 flex gap-2">
+          <select id="discussionTestSelector" class="px-4 py-2 border border-gray-200 rounded-xl bg-white flex-1">
+            <option value="">-- Select Test --</option>
+          </select>
+          <button onclick="loadDiscussions()" id="loadDiscussionsBtn" class="px-4 py-2 rounded-xl bg-white border border-gray-300 flex items-center gap-2">
+            <span>Load</span>
+            <i class="fas fa-spinner fa-spin hidden" id="discussionSpinner"></i>
+          </button>
+        </div>
+        <div id="discussionsList" class="space-y-4"></div>
+      </div>
+
+      <!-- Tab: Messages -->
+      <div id="messagesTab" class="tab-pane hidden">
+        <div class="flex justify-between items-center mb-2">
+          <h3 class="font-semibold">Messages</h3>
+          <i class="fas fa-sync-alt refresh-btn" onclick="loadMessages()" title="Refresh"></i>
+        </div>
+        <div id="messageThreads" class="space-y-4 max-h-96 overflow-y-auto p-2"></div>
+        <div class="mt-4">
+          <textarea id="newMessageText" placeholder="Type your message..." class="w-full px-4 py-3 border border-gray-200 rounded-xl"></textarea>
+          <button onclick="sendMessage()" id="sendMsgBtn" class="mt-2 bg-blue-600 text-white px-6 py-2 rounded-full flex items-center gap-2">
+            <span>Send</span>
+            <i class="fas fa-spinner fa-spin hidden" id="msgSpinner"></i>
+          </button>
+          <p id="blockWarning" class="text-red-600 text-sm hidden mt-2">You are blocked from sending messages.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Global Message -->
+    <div id="message" class="mt-4 text-sm text-center hidden p-3 rounded-xl"></div>
+  </div>
+
+  <!-- Blocked Modal -->
+  <div id="blockedModal" class="modal">
+    <div class="modal-content">
+      <div class="text-5xl mb-4">🚫</div>
+      <h2 class="text-2xl font-bold text-gray-800 mb-2">Account Blocked</h2>
+      <p class="text-gray-600 mb-2" id="blockReasonDisplay"></p>
+      <textarea id="unblockRequestReason" placeholder="Optional: tell us why you need to be unblocked..." class="w-full border rounded-xl px-4 py-3 mb-4" rows="3"></textarea>
+      <div class="flex gap-3">
+        <button onclick="sendUnblockRequest()" id="unblockRequestBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-full font-medium shadow-lg transition flex-1 flex items-center justify-center gap-2">
+          <span>Request Unblock</span>
+          <i class="fas fa-spinner fa-spin hidden" id="unblockSpinner"></i>
+        </button>
+        <button onclick="closeModal('blockedModal')" class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-6 py-2 rounded-full font-medium transition flex-1">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rank Info Modal -->
+  <div id="rankInfoModal" class="modal">
+    <div class="modal-content">
+      <div class="text-5xl mb-4">📊</div>
+      <h2 class="text-2xl font-bold text-gray-800 mb-2">Rank Information</h2>
+      <p class="text-gray-600">Your rank is based on your score compared to all other students who have taken the same test. If another student scores higher than you after you've taken the test, your rank may decrease.</p>
+      <button onclick="closeModal('rankInfoModal')" class="mt-4 bg-blue-600 text-white px-6 py-2 rounded-full">Close</button>
+    </div>
+  </div>
+
+  <!-- Analysis Modal (with top 3 rankers) -->
+  <div id="analysisModal" class="modal">
+    <div class="modal-content max-w-3xl">
+      <h3 class="text-xl font-bold mb-4" id="analysisTestName"></h3>
+      <div class="mb-4 p-3 bg-blue-50 rounded-xl">
+        <p class="font-semibold">🏆 Top 3 Rankers</p>
+        <div id="topRankersList" class="text-sm space-y-1 mt-2"></div>
+      </div>
+      <div id="analysisContent" class="space-y-4 max-h-96 overflow-y-auto"></div>
+      <button onclick="closeModal('analysisModal')" class="mt-4 px-6 py-2 rounded-full border">Close</button>
+    </div>
+  </div>
+
+  <!-- All Participants Modal (for toppers button) -->
+  <div id="allParticipantsModal" class="modal">
+    <div class="modal-content max-w-3xl">
+      <h3 class="text-xl font-bold mb-4" id="participantsTestName"></h3>
+      <div id="participantsList" class="space-y-2 max-h-96 overflow-y-auto"></div>
+      <button onclick="closeModal('allParticipantsModal')" class="mt-4 px-6 py-2 rounded-full border">Close</button>
+    </div>
+  </div>
+
+  <script>
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwVuM4KZb8TvbvAj6CdgrHNLMun9Sim9uOphXmsxQLrrSV0VeY4xXAdUDaTWtZ188ndNA/exec'; // Replace
+    const translations = {
+      en: { appTitle: '📘 Student Portal', studentId: 'Student ID', dob: 'Date of Birth (8 digits)', dobHint: 'Exactly 8 digits, e.g. 01012005', login: 'Login', logout: 'Logout', availableTests: 'Available Tests', previousResults: 'Previous Results', discussions: 'Discussions', messages: 'Messages', testsTaken: 'Tests Taken', avgScore: 'Avg. Score', startTest: 'Start Test' },
+      hi: { appTitle: '📘 छात्र पोर्टल', studentId: 'छात्र आईडी', dob: 'जन्म तिथि (8 अंक)', dobHint: 'बिल्कुल 8 अंक, जैसे 01012005', login: 'लॉग इन', logout: 'लॉग आउट', availableTests: 'उपलब्ध परीक्षाएँ', previousResults: 'पिछले परिणाम', discussions: 'चर्चाएँ', messages: 'संदेश', testsTaken: 'दिए गए टेस्ट', avgScore: 'औसत अंक', startTest: 'परीक्षा शुरू करें' }
+    };
+    let currentLang = 'en';
+    let studentToken = localStorage.getItem('studentToken');
+    let studentInfo = null;
+    let isBlocked = false;
+    let loginId = '', loginDob = ''; // store for unblock request
+
+    function setLanguage(lang) {
+      currentLang = lang;
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.dataset.i18n;
+        if (translations[lang]?.[key]) {
+          if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') el.placeholder = translations[lang][key];
+          else el.innerText = translations[lang][key];
+        }
+      });
+    }
+
+    function showMessage(msg, isError = false) {
+      const msgDiv = document.getElementById('message');
+      msgDiv.classList.remove('hidden');
+      msgDiv.className = `mt-4 text-sm text-center p-3 rounded-xl ${isError ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`;
+      msgDiv.innerText = msg;
+      setTimeout(() => msgDiv.classList.add('hidden'), 4000);
+    }
+
+    window.onload = function() {
+      setLanguage('en');
+      if (studentToken) {
+        verifyTokenAndLoad();
+      }
+    };
+
+    async function verifyTokenAndLoad() {
+      try {
+        await loadDashboard();
+      } catch (e) {
+        localStorage.removeItem('studentToken');
+        window.location.reload();
+      }
+    }
+
+    async function handleLogin() {
+      const id = document.getElementById('studentId').value.trim();
+      const dob = document.getElementById('dob').value.trim();
+      loginId = id; loginDob = dob;
+      if (!id || !dob) return showMessage('Fill all fields', true);
+      if (dob.length !== 8) return showMessage('DOB must be exactly 8 digits', true);
+      
+      const btn = document.getElementById('loginBtn');
+      const original = btn.innerHTML;
+      btn.disabled = true; btn.innerHTML = `<div class="loading-dots"><span></span><span></span><span></span></div>`;
+      try {
+        const res = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'login', id, dob }) });
+        const data = await res.json();
+        if (data.status === 'success') {
+          localStorage.setItem('studentToken', data.token);
+          localStorage.setItem('studentName', data.data.name);
+          localStorage.setItem('studentId', data.data.id);
+          studentToken = data.token;
+          document.getElementById('loginForm').classList.add('hidden');
+          document.getElementById('dashboardContainer').classList.remove('hidden');
+          loadDashboard();
+        } else if (data.status === 'blocked') {
+          document.getElementById('blockReasonDisplay').innerText = `Reason: ${data.data.reason}`;
+          document.getElementById('blockedModal').style.display = 'flex';
+          btn.disabled = false; btn.innerHTML = original;
+        } else {
+          showMessage(data.data, true);
+          btn.disabled = false; btn.innerHTML = original;
+        }
+      } catch(e) { showMessage(e.message, true); btn.disabled = false; btn.innerHTML = original; }
+    }
+
+    async function sendUnblockRequest() {
+      const reason = document.getElementById('unblockRequestReason').value;
+      if (!loginId || !loginDob) {
+        showMessage('Session expired. Please login again.', true);
+        closeModal('blockedModal');
+        return;
+      }
+      const btn = document.getElementById('unblockRequestBtn');
+      const spinner = document.getElementById('unblockSpinner');
+      btn.disabled = true;
+      spinner.classList.remove('hidden');
+      try {
+        const res = await fetch(APPS_SCRIPT_URL, {
+          method: 'POST',
+          body: JSON.stringify({ action: 'sendUnblockRequest', id: loginId, dob: loginDob, reason })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+          showMessage('Request sent to admin. You will be notified if unblocked.');
+          closeModal('blockedModal');
+        } else {
+          showMessage(data.data, true);
+        }
+      } catch(e) { showMessage(e.message, true); }
+      btn.disabled = false;
+      spinner.classList.add('hidden');
+    }
+
+    function logout() {
+      if (confirm('Are you sure you want to logout?')) {
+        localStorage.removeItem('studentToken');
+        localStorage.removeItem('studentName');
+        localStorage.removeItem('studentId');
+        studentToken = null;
+        document.getElementById('dashboardContainer').classList.add('hidden');
+        document.getElementById('loginForm').classList.remove('hidden');
+      }
+    }
+
+    function showRankInfo() {
+      document.getElementById('rankInfoModal').style.display = 'flex';
+    }
+
+    async function loadDashboard() {
+      try {
+        const infoRes = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'getStudentDashboard', token: studentToken }) });
+        const infoData = await infoRes.json();
+        if (infoData.status === 'success') {
+          studentInfo = infoData.data;
+          document.getElementById('studentNameDisplay').innerText = studentInfo.name;
+          document.getElementById('studentIdDisplay').innerText = `ID: ${studentInfo.id}`;
+          document.getElementById('studentDobDisplay').innerText = `DOB: ${studentInfo.dob}`;
+          
+          const blockRes = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'checkBlocked', token: studentToken }) });
+          const blockData = await blockRes.json();
+          isBlocked = blockData.status === 'success' && blockData.data.blocked;
+          if (isBlocked) document.getElementById('blockWarning').classList.remove('hidden');
+        } else {
+          throw new Error('Invalid token');
+        }
+      } catch(e) { console.error(e); throw e; }
+
+      loadAvailableTests();
+      loadResults();
+      loadTestsForDiscussionSelector();
+      loadMessages();
+    }
+
+    async function loadAvailableTests() {
+      const container = document.getElementById('availableTestsList');
+      container.innerHTML = `<div class="loading-dots"><span></span><span></span><span></span></div>`;
+      const res = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'getAvailableTests', token: studentToken }) });
+      const data = await res.json();
+      if (data.status !== 'success') return;
+      let html = '';
+      data.data.forEach(test => {
+        html += `<div class="flex items-center justify-between bg-white/70 p-4 rounded-xl border border-gray-100">
+          <div>
+            <h4 class="font-semibold">${test.testName}</h4>
+            <p class="text-sm text-gray-600">${test.duration} min | +${test.correctMarks} / -${test.wrongMarks} / 0:${test.skipMarks}</p>
+          </div>
+          <button onclick="startTest('${test.testId}')" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-full text-sm font-medium shadow-md transition flex items-center gap-2">
+            <i class="fas fa-play"></i> ${translations[currentLang].startTest}
+          </button>
+        </div>`;
+      });
+      container.innerHTML = html || '<p class="text-gray-500">No tests available.</p>';
+    }
+
+    function startTest(testId) { window.location.href = `test.html?testId=${testId}`; }
+
+    async function loadResults() {
+      const container = document.getElementById('previousResultsList');
+      container.innerHTML = `<div class="loading-dots"><span></span><span></span><span></span></div>`;
+      const res = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'getStudentResults', token: studentToken }) });
+      const data = await res.json();
+      if (data.status !== 'success') return;
+      let html = '<table class="w-full text-sm"><thead class="bg-gray-100"><tr><th>Test</th><th>Score</th><th>Rank</th><th>Submitted</th><th></th><th></th></tr></thead><tbody>';
+      let totalScore = 0;
+      data.data.forEach(r => {
+        totalScore += r.score;
+        html += `<tr><td class="p-2">${r.testName}</td><td class="p-2">${r.score}</td><td class="p-2">#${r.rank}</td><td class="p-2">${new Date(r.submitted).toLocaleDateString()}</td>
+        <td><button onclick="viewAnalysis('${r.testId}')" class="text-blue-600 text-sm">View Analysis</button></td>
+        <td><button onclick="viewAllParticipants('${r.testId}')" class="text-green-600 text-sm">View Toppers</button></td></tr>`;
+      });
+      html += '</tbody></table>';
+      container.innerHTML = html || '<p class="text-gray-500">No results.</p>';
+      document.getElementById('statsTestsTaken').innerText = data.data.length;
+      document.getElementById('statsAvgScore').innerText = data.data.length ? (totalScore / data.data.length).toFixed(2) : '0';
+    }
+
+    async function viewAnalysis(testId) {
+      const btn = event.target;
+      const original = btn.innerHTML;
+      btn.disabled = true; btn.innerHTML = `<div class="loading-dots"><span></span><span></span><span></span></div>`;
+      const res = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'getTestAnalysis', token: studentToken, testId }) });
+      const data = await res.json();
+      btn.disabled = false; btn.innerHTML = original;
+      if (data.status !== 'success') return showMessage(data.data, true);
+      const analysis = data.data;
+      document.getElementById('analysisTestName').innerText = analysis.testName;
+      
+      // Fetch top 3 rankers
+      const toppersRes = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'getToppers', token: studentToken, testId }) });
+      const toppersData = await toppersRes.json();
+      let toppersHtml = '';
+      if (toppersData.status === 'success') {
+        toppersData.data.forEach((t, idx) => {
+          toppersHtml += `<div>${idx+1}. ${t.name} – ${t.score} marks</div>`;
+        });
+      }
+      document.getElementById('topRankersList').innerHTML = toppersHtml || 'No data';
+
+      let html = '';
+      analysis.questions.forEach(q => {
+        const statusClass = q.isCorrect ? 'text-green-600' : 'text-red-600';
+        let imgHtml = '';
+        if (q.imageUrl) {
+          const urls = q.imageUrl.split(';').map(u => u.trim()).filter(u => u);
+          if (urls.length) imgHtml = `<img src="${urls[0]}" class="max-h-24 mt-2 rounded border">`;
+        }
+        html += `<div class="border p-4 rounded-xl">
+          <p><strong>Q:</strong> ${q.qText}</p>
+          ${imgHtml}
+          <p><strong>Your Answer:</strong> ${q.selected}</p>
+          <p><strong>Correct Answer:</strong> ${q.correct}</p>
+          <p class="${statusClass}"><strong>Marks:</strong> ${q.marks}</p>
+        </div>`;
+      });
+      document.getElementById('analysisContent').innerHTML = html;
+      document.getElementById('analysisModal').style.display = 'flex';
+    }
+
+    async function viewAllParticipants(testId) {
+      document.getElementById('allParticipantsModal').style.display = 'flex';
+      document.getElementById('participantsList').innerHTML = `<div class="loading-dots"><span></span><span></span><span></span></div>`;
+      const res = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'getTestParticipants', token: studentToken, testId }) });
+      const data = await res.json();
+      if (data.status !== 'success') { showMessage(data.data, true); closeModal('allParticipantsModal'); return; }
+      let html = '';
+      data.data.forEach(p => {
+        html += `<div class="flex justify-between border-b py-2">
+          <span>${p.rank}. ${p.name} (${p.studentId})</span>
+          <span class="font-bold">${p.score} marks</span>
+        </div>`;
+      });
+      document.getElementById('participantsList').innerHTML = html;
+      // Optionally set test name
+      const test = data.data[0]?.testName || '';
+      document.getElementById('participantsTestName').innerText = `All Participants - ${test}`;
+    }
+
+    async function loadTestsForDiscussionSelector() {
+      const res = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'getAllTestNames', token: studentToken }) });
+      const data = await res.json();
+      if (data.status !== 'success') return;
+      let opts = '<option value="">-- Select Test --</option>';
+      data.data.forEach(t => opts += `<option value="${t.testId}">${t.testName}</option>`);
+      document.getElementById('discussionTestSelector').innerHTML = opts;
+    }
+
+    async function loadDiscussions() {
+      const testId = document.getElementById('discussionTestSelector').value;
+      if (!testId) return showMessage('Select a test', true);
+      const btn = document.getElementById('loadDiscussionsBtn');
+      const spinner = document.getElementById('discussionSpinner');
+      btn.disabled = true;
+      spinner.classList.remove('hidden');
+      const res = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'getDiscussions', token: studentToken, testId }) });
+      const data = await res.json();
+      btn.disabled = false;
+      spinner.classList.add('hidden');
+      if (data.status !== 'success') return;
+      let html = '';
+      data.data.forEach(post => {
+        let linkHtml = '';
+        if (post.link) {
+          linkHtml = `<a href="${post.link}" target="_blank" class="text-blue-600 block mt-2">🔗 ${post.link}</a>`;
+        }
+        html += `<div class="bg-white/70 p-4 rounded-xl">
+          <h4 class="font-bold">${post.title}</h4>
+          <p class="text-sm text-gray-600">${post.description}</p>
+          ${linkHtml}
+          <span class="text-xs text-gray-400">${new Date(post.created).toLocaleString()}</span>
+        </div>`;
+      });
+      document.getElementById('discussionsList').innerHTML = html || 'No discussions.';
+    }
+
+    async function loadMessages() {
+      if (isBlocked) return;
+      const container = document.getElementById('messageThreads');
+      container.innerHTML = `<div class="loading-dots"><span></span><span></span><span></span></div>`;
+      const res = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify({ action: 'getMessages', token: studentToken }) });
+      const data = await res.json();
+      if (data.status !== 'success') return;
+      let html = '';
+      const messages = data.data.sort((a,b) => new Date(a.timestamp) - new Date(b.timestamp));
+      messages.forEach(msg => {
+        const bubbleClass = msg.sender === 'student' ? 'message-bubble-student' : 'message-bubble-admin';
+        const align = msg.sender === 'student' ? 'justify-end' : 'justify-start';
+        html += `<div class="flex ${align} mb-2">
+          <div class="${bubbleClass} max-w-xs p-3 rounded-2xl">${msg.text}
+            <span class="text-xs block mt-1 opacity-70">${new Date(msg.timestamp).toLocaleString()}</span>
+          </div>
+        </div>`;
+      });
+      container.innerHTML = html || '<p class="text-gray-500">No messages.</p>';
+    }
+
+    async function sendMessage() {
+      if (isBlocked) return showMessage('You are blocked', true);
+      const text = document.getElementById('newMessageText').value.trim();
+      if (!text) return showMessage('Enter a message', true);
+
+      const btn = document.getElementById('sendMsgBtn');
+      const spinner = document.getElementById('msgSpinner');
+      btn.disabled = true;
+      spinner.classList.remove('hidden');
+
+      const formData = new FormData();
+      formData.append('action', 'sendMessage');
+      formData.append('token', studentToken);
+      formData.append('text', text);
+
+      try {
+        const res = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.status === 'success') {
+          document.getElementById('newMessageText').value = '';
+          loadMessages();
+        } else showMessage(data.data, true);
+      } catch(e) { showMessage(e.message, true); }
+      btn.disabled = false;
+      spinner.classList.add('hidden');
+    }
+
+    function showTab(tab) {
+      document.querySelectorAll('.tab-pane').forEach(p => p.classList.add('hidden'));
+      document.getElementById(tab + 'Tab').classList.remove('hidden');
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('border-blue-500', 'text-blue-600'));
+      document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1)).classList.add('border-blue-500', 'text-blue-600');
+      // Load data when tab is shown
+      if (tab === 'tests') loadAvailableTests();
+      if (tab === 'results') loadResults();
+      if (tab === 'discussions') { loadTestsForDiscussionSelector(); loadDiscussions(); }
+      if (tab === 'messages') loadMessages();
+    }
+
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+    window.onclick = function(e) { if (e.target.classList.contains('modal')) closeAllModals(); };
+    function closeAllModals() { document.querySelectorAll('.modal').forEach(m => m.style.display = 'none'); }
+  </script>
+</body>
+</html>
