@@ -126,10 +126,10 @@
   <script>
     const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwVuM4KZb8TvbvAj6CdgrHNLMun9Sim9uOphXmsxQLrrSV0VeY4xXAdUDaTWtZ188ndNA/exec'; // Replace
     const token = localStorage.getItem('studentToken');
-    if (!token) window.location.href = 'student.html';
+    if (!token) window.location.href = 'index.html';
     const urlParams = new URLSearchParams(window.location.search);
     const testId = urlParams.get('testId');
-    if (!testId) window.location.href = 'student.html';
+    if (!testId) window.location.href = 'index.html';
 
     let questions = [], currentIndex = 0, answers = {}, flagged = {}, testInfo = null, timeLeft = 0, timerInterval;
     let currentLang = 'en';
@@ -165,7 +165,7 @@
         questions.forEach(q => questionTypes[q.qId] = q.type);
         buildNavigator();
         renderQuestion(0);
-      } catch(e) { alert('Error: '+e.message); window.location.href = 'student.html'; }
+      } catch(e) { alert('Error: '+e.message); window.location.href = 'index.html'; }
     }
 
     function buildNavigator() {
@@ -375,7 +375,7 @@
     }
 
     function openSubmitModal() { submitTest(); }
-    function closeResultModal() { window.location.href = 'student.html'; }
+    function closeResultModal() { window.location.href = 'index.html'; }
   </script>
 </body>
 </html>
